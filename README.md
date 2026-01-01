@@ -8,9 +8,16 @@ A machine information report used at [United States Graphics Company](https://x.
 
 <img src="https://github.com/usgraphics/TR-100/assets/8161031/2a8412dd-09de-45ff-8dfb-e5c6b6f19212" width="500" />
 
-‼️*** WARNING ***‼️
+## Platform Support
 
-Alpha release, only compatible with Debian systems with ZFS root partition running as `root` user. This is not ready for public use *at all*. But you should totally try to use it. The worst that's going to happen is it'll destroy your system. Your help is appreciated in making this project production worthy.
+| Script | Platform | Notes |
+|--------|----------|-------|
+| `machine_report.sh` | Debian + ZFS | Original script with ZFS root partition support |
+| `machine_report_debian.sh` | Debian/Ubuntu | Standard filesystem (ext4, btrfs, etc.) |
+| `machine_report_macos.sh` | macOS (Apple Silicon) | Supports M1/M2/M3/M4 with P/E core display |
+| `machine_report_openwrt.sh` | OpenWrt | BusyBox-compatible for embedded devices |
+
+Choose the script that matches your platform. Each is a standalone single file.
 
 # Software Philosophy
 Since it is a bash script, you've got the source code. Just modify that for your needs. No need for any abstractions, directly edit the code. No modules, no DSL, no config files, none of it. Single file for easy deployment. Only abstraction that's acceptable is variables at the top of the script to customize the system, but it should stay minimal. 
@@ -28,18 +35,18 @@ Another consideration is to avoid abstracting the source code at the expense of 
 # Design Philosophy
 Tabular, short, clear and concise. The tool's job is to inform the user of the current state of the system they are logging in or are operating. No emojis (except for the one used as a warning sign). No colors (as default, might add an option to add colors).
 
-# Assumed Setup
-This script is designed for us, for our internal use.
-
-- AMD EPYC CPU
-- Debian OS
-- ZFS installed on root partition
-- VMWare Hypervisor
-
 # Dependencies
-- `lscpu`
 
-If your system is different, things might break. Look up the offending line and you can try to fix it for your specific system.
+**Debian/Ubuntu (`machine_report.sh`, `machine_report_debian.sh`):**
+- `lscpu` (from util-linux)
+- `lastlog` (from shadow-utils)
+
+**macOS (`machine_report_macos.sh`):**
+- Built-in commands only (`sysctl`, `sw_vers`, `vm_stat`)
+
+**OpenWrt (`machine_report_openwrt.sh`):**
+- BusyBox (standard on OpenWrt)
+- No external dependencies
 
 # Installation
 

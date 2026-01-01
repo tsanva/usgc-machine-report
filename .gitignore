@@ -1,2 +1,6 @@
 .idea/
 .DS_Store
+.claude/
+
+# Development files
+PLAN.md
