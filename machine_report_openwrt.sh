@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # TR-100 Machine Report - OpenWrt Edition
 # Copyright © 2024, U.S. Graphics, LLC. BSD-3-Clause License.
 # Designed for OpenWrt on GL-MT300N-V2 and similar embedded devices
@@ -24,12 +24,12 @@ max_length() {
 
     for str in "$@"; do
         len=${#str}
-        if (( len > max_len )); then
+        if [ "$len" -gt "$max_len" ]; then
             max_len=$len
         fi
     done
 
-    if [ $max_len -lt $MAX_DATA_LEN ]; then
+    if [ "$max_len" -lt "$MAX_DATA_LEN" ]; then
         printf '%s' "$max_len"
     else
         printf '%s' "$MAX_DATA_LEN"
@@ -67,12 +67,14 @@ PRINT_HEADER() {
 
     local top="┌"
     local bottom="├"
-    for (( i = 0; i < length - 2; i++ )); do
-        top+="┬"
-        bottom+="┴"
+    local i=0
+    while [ "$i" -lt "$((length - 2))" ]; do
+        top="${top}┬"
+        bottom="${bottom}┴"
+        i=$((i + 1))
     done
-    top+="┐"
-    bottom+="┤"
+    top="${top}┐"
+    bottom="${bottom}┤"
 
     printf '%s\n' "$top"
     printf '%s\n' "$bottom"
@@ -93,32 +95,37 @@ PRINT_CENTERED_DATA() {
 PRINT_DIVIDER() {
     # either "top" or "bottom", no argument means middle divider
     local side="$1"
+    local left_symbol
+    local middle_symbol
+    local right_symbol
     case "$side" in
         "top")
-            local left_symbol="├"
-            local middle_symbol="┬"
-            local right_symbol="┤"
+            left_symbol="├"
+            middle_symbol="┬"
+            right_symbol="┤"
             ;;
         "bottom")
-            local left_symbol="└"
-            local middle_symbol="┴"
-            local right_symbol="┘"
+            left_symbol="└"
+            middle_symbol="┴"
+            right_symbol="┘"
             ;;
         *)
-            local left_symbol="├"
-            local middle_symbol="┼"
-            local right_symbol="┤"
+            left_symbol="├"
+            middle_symbol="┼"
+            right_symbol="┤"
     esac
 
     local length=$((CURRENT_LEN+MAX_NAME_LEN+BORDERS_AND_PADDING))
     local divider="$left_symbol"
-    for (( i = 0; i < length - 3; i++ )); do
-        divider+="─"
+    local i=0
+    while [ "$i" -lt "$((length - 3))" ]; do
+        divider="${divider}─"
         if [ "$i" -eq 14 ]; then
-            divider+="$middle_symbol"
+            divider="${divider}${middle_symbol}"
         fi
+        i=$((i + 1))
     done
-    divider+="$right_symbol"
+    divider="${divider}${right_symbol}"
     printf '%s\n' "$divider"
 }
 
@@ -129,20 +136,41 @@ PRINT_DATA() {
 
     # Pad name
     local name_len=${#name}
-    if (( name_len < MIN_NAME_LEN )); then
+    if [ "$name_len" -lt "$MIN_NAME_LEN" ]; then
         name=$(printf "%-${MIN_NAME_LEN}s" "$name")
-    elif (( name_len > MAX_NAME_LEN )); then
+    elif [ "$name_len" -gt "$MAX_NAME_LEN" ]; then
         name=$(echo "$name" | cut -c 1-$((MAX_NAME_LEN-3)))...
     else
         name=$(printf "%-${MAX_NAME_LEN}s" "$name")
     fi
 
-    # Truncate or pad data
-    local data_len=${#data}
-    if (( data_len >= MAX_DATA_LEN || data_len == MAX_DATA_LEN-1 )); then
-        data=$(echo "$data" | cut -c 1-$((MAX_DATA_LEN-3-2)))...
+    # Calculate display width (handles multi-byte UTF-8 like █ and ░)
+    # Bar graph characters are 3 bytes but 1 display column each
+    local byte_len=${#data}
+    local display_len
+    # Check if data contains bar graph characters (█ or ░)
+    if echo "$data" | grep -q '[█░]'; then
+        # Count actual characters using awk for UTF-8 awareness
+        display_len=$(printf '%s' "$data" | awk '{print length}')
     else
-        data=$(printf "%-${max_data_len}s" "$data")
+        display_len=$byte_len
+    fi
+
+    # Truncate or pad data based on display width
+    if [ "$display_len" -ge "$MAX_DATA_LEN" ] || [ "$display_len" -eq "$((MAX_DATA_LEN-1))" ]; then
+        # For ASCII text, truncate normally
+        if ! echo "$data" | grep -q '[█░]'; then
+            data=$(echo "$data" | cut -c 1-$((MAX_DATA_LEN-3-2)))...
+        fi
+        # Don't truncate bar graphs - they're pre-sized
+    else
+        # Pad with spaces to reach max_data_len
+        local padding=$((max_data_len - display_len))
+        local i=0
+        while [ "$i" -lt "$padding" ]; do
+            data="${data} "
+            i=$((i + 1))
+        done
     fi
 
     printf "│ %-${MAX_NAME_LEN}s │ %s │\n" "$name" "$data"
@@ -151,13 +179,15 @@ PRINT_DATA() {
 PRINT_FOOTER() {
     local length=$((CURRENT_LEN+MAX_NAME_LEN+BORDERS_AND_PADDING))
     local footer="└"
-    for (( i = 0; i < length - 3; i++ )); do
-        footer+="─"
+    local i=0
+    while [ "$i" -lt "$((length - 3))" ]; do
+        footer="${footer}─"
         if [ "$i" -eq 14 ]; then
-            footer+="┴"
+            footer="${footer}┴"
         fi
+        i=$((i + 1))
     done
-    footer+="┘"
+    footer="${footer}┘"
     printf '%s\n' "$footer"
 }
 
@@ -169,7 +199,7 @@ bar_graph() {
     local used=$1
     local total=$2
 
-    if (( total == 0 )); then
+    if [ "$total" -eq 0 ] 2>/dev/null; then
         percent=0
     else
         percent=$(awk -v used="$used" -v total="$total" 'BEGIN { printf "%.2f", (used / total) * 100 }')
@@ -177,11 +207,15 @@ bar_graph() {
 
     num_blocks=$(awk -v percent="$percent" -v width="$width" 'BEGIN { printf "%d", (percent / 100) * width }')
 
-    for (( i = 0; i < num_blocks; i++ )); do
-        graph+="█"
+    local i=0
+    while [ "$i" -lt "$num_blocks" ]; do
+        graph="${graph}█"
+        i=$((i + 1))
     done
-    for (( i = num_blocks; i < width; i++ )); do
-        graph+="░"
+    i=$num_blocks
+    while [ "$i" -lt "$width" ]; do
+        graph="${graph}░"
+        i=$((i + 1))
     done
     printf "%s" "${graph}"
 }
@@ -192,7 +226,7 @@ get_ip_addr() {
     ipv6_address=""
 
     # OpenWrt typically uses ifconfig (BusyBox)
-    if command -v ifconfig &> /dev/null; then
+    if command -v ifconfig >/dev/null 2>&1; then
         # Try common OpenWrt interfaces: br-lan, eth0, wlan0
         for iface in br-lan eth0 wlan0; do
             ipv4_address=$(ifconfig "$iface" 2>/dev/null | awk '/inet addr:/ {split($2, a, ":"); print a[2]}')
@@ -219,7 +253,7 @@ get_ip_addr() {
     fi
 
     # If no IPv4 found, try ip command as fallback
-    if [ -z "$ipv4_address" ] && command -v ip &> /dev/null; then
+    if [ -z "$ipv4_address" ] && command -v ip >/dev/null 2>&1; then
         ipv4_address=$(ip -o -4 addr show 2>/dev/null | awk '
             $2 != "lo" {split($4, a, "/"); if (!found++) print a[1]}')
     fi
@@ -247,7 +281,16 @@ fi
 os_kernel=$({ uname; uname -r; } | tr '\n' ' ')
 
 # Network Information
-net_current_user=$(whoami)
+# Get current user (whoami may not exist on minimal BusyBox)
+if command -v whoami >/dev/null 2>&1; then
+    net_current_user=$(whoami)
+elif [ -n "$USER" ]; then
+    net_current_user="$USER"
+elif [ -n "$LOGNAME" ]; then
+    net_current_user="$LOGNAME"
+else
+    net_current_user=$(id -un 2>/dev/null || echo "unknown")
+fi
 net_hostname=$(hostname 2>/dev/null)
 if [ -z "$net_hostname" ]; then
     net_hostname=$(cat /proc/sys/kernel/hostname 2>/dev/null)
@@ -255,18 +298,41 @@ fi
 if [ -z "$net_hostname" ]; then net_hostname="Not Defined"; fi
 
 net_machine_ip=$(get_ip_addr)
-net_client_ip=$(who am i 2>/dev/null | awk '{print $5}' | tr -d '()')
+
+# Client IP - try multiple methods for OpenWrt
+net_client_ip=""
+# Method 1: SSH_CLIENT or SSH_CONNECTION environment variable (set by dropbear/openssh)
+if [ -n "$SSH_CLIENT" ]; then
+    net_client_ip=$(echo "$SSH_CLIENT" | awk '{print $1}')
+elif [ -n "$SSH_CONNECTION" ]; then
+    net_client_ip=$(echo "$SSH_CONNECTION" | awk '{print $1}')
+fi
+# Method 2: Try who am i (may not work on BusyBox)
 if [ -z "$net_client_ip" ]; then
-    net_client_ip="Not connected"
+    who_output=$(who am i 2>/dev/null)
+    if [ -n "$who_output" ]; then
+        # Extract content in parentheses if present
+        net_client_ip=$(echo "$who_output" | grep -o '([^)]*)' | tr -d '()')
+    fi
+fi
+# Fallback
+if [ -z "$net_client_ip" ]; then
+    net_client_ip="Local session"
 fi
 
-# DNS from resolv.conf
-net_dns_ip=()
+# DNS from resolv.conf (stored as space-separated string for POSIX compatibility)
+net_dns_ip=""
+dns_count=0
 if [ -f /etc/resolv.conf ]; then
     while read -r line; do
         if echo "$line" | grep -q '^nameserver'; then
             dns=$(echo "$line" | awk '{print $2}')
-            net_dns_ip+=("$dns")
+            if [ -n "$net_dns_ip" ]; then
+                net_dns_ip="$net_dns_ip $dns"
+            else
+                net_dns_ip="$dns"
+            fi
+            dns_count=$((dns_count + 1))
         fi
     done < /etc/resolv.conf
 fi
@@ -343,18 +409,6 @@ root_total_gb=$(awk -v total="${root_total:-0}" 'BEGIN { printf "%.2f", total / 
 root_used_gb=$(awk -v used="${root_used:-0}" 'BEGIN { printf "%.2f", used / 1024 }')
 disk_percent=$(awk -v used="${root_used:-0}" -v total="${root_total:-1}" 'BEGIN { printf "%.2f", (used / total) * 100 }')
 
-# Last login - try 'last' command (may not be available)
-if command -v last &> /dev/null; then
-    last_login_output=$(last -1 2>/dev/null | head -1)
-    if [ -n "$last_login_output" ] && ! echo "$last_login_output" | grep -q "wtmp"; then
-        last_login_time=$(echo "$last_login_output" | awk '{print $4, $5, $6, $7}')
-    else
-        last_login_time="Not available"
-    fi
-else
-    last_login_time="Not available"
-fi
-
 # Uptime - parse /proc/uptime (no uptime -p in BusyBox)
 uptime_raw=$(cut -d. -f1 /proc/uptime 2>/dev/null)
 if [ -n "$uptime_raw" ]; then
@@ -364,6 +418,23 @@ if [ -n "$uptime_raw" ]; then
     sys_uptime="${uptime_days}d ${uptime_hours}h ${uptime_mins}m"
 else
     sys_uptime="Unknown"
+fi
+
+# Last login - try multiple methods for OpenWrt
+last_login_time=""
+if command -v last >/dev/null 2>&1; then
+    last_login_output=$(last -1 2>/dev/null | head -1)
+    if [ -n "$last_login_output" ] && ! echo "$last_login_output" | grep -q "wtmp"; then
+        last_login_time=$(echo "$last_login_output" | awk '{print $4, $5, $6, $7}')
+    fi
+fi
+# Fallback: check system log for login events
+if [ -z "$last_login_time" ] && [ -f /var/log/messages ]; then
+    last_login_time=$(grep -E 'login|dropbear|sshd' /var/log/messages 2>/dev/null | tail -1 | awk '{print $1, $2, $3}')
+fi
+# Fallback: show system boot time as reference
+if [ -z "$last_login_time" ]; then
+    last_login_time="(boot: ${sys_uptime} ago)"
 fi
 
 # Set current length before graphs get calculated
@@ -389,8 +460,10 @@ PRINT_DATA "HOSTNAME" "$net_hostname"
 PRINT_DATA "MACHINE IP" "$net_machine_ip"
 PRINT_DATA "CLIENT  IP" "$net_client_ip"
 
-for dns_num in "${!net_dns_ip[@]}"; do
-    PRINT_DATA "DNS  IP $(($dns_num + 1))" "${net_dns_ip[dns_num]}"
+dns_num=1
+for dns_ip in $net_dns_ip; do
+    PRINT_DATA "DNS  IP $dns_num" "$dns_ip"
+    dns_num=$((dns_num + 1))
 done
 
 PRINT_DATA "USER" "$net_current_user"

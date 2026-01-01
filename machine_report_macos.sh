@@ -237,17 +237,29 @@ net_hostname=$(hostname)
 if [ -z "$net_hostname" ]; then net_hostname="Not Defined"; fi
 
 net_machine_ip=$(get_ip_addr)
-net_client_ip=$(who am i 2>/dev/null | awk '{print $5}' | tr -d '()')
+
+# Client IP - only populated when connected via SSH
+# who am i output varies: "user  tty  date time" (local) vs "user  tty  date time (ip)" (SSH)
+who_output=$(who am i 2>/dev/null)
+if [ -n "$who_output" ]; then
+    # Extract content in parentheses if present (SSH connection)
+    net_client_ip=$(echo "$who_output" | grep -o '([^)]*)' | tr -d '()')
+    # Validate it looks like an IP address
+    if [ -n "$net_client_ip" ] && ! echo "$net_client_ip" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+        net_client_ip=""
+    fi
+fi
 if [ -z "$net_client_ip" ]; then
-    net_client_ip="Not connected"
+    net_client_ip="Local session"
 fi
 
-# DNS from scutil or resolv.conf
+# DNS from scutil or resolv.conf (deduplicated)
 if command -v scutil &> /dev/null; then
-    net_dns_ip=($(scutil --dns 2>/dev/null | grep 'nameserver\[' | awk '{print $3}' | head -3))
+    # Get unique DNS servers, limit to 3
+    net_dns_ip=($(scutil --dns 2>/dev/null | grep 'nameserver\[' | awk '{print $3}' | sort -u | head -3))
 fi
 if [ ${#net_dns_ip[@]} -eq 0 ] && [ -f /etc/resolv.conf ]; then
-    net_dns_ip=($(grep '^nameserver [0-9.]' /etc/resolv.conf | awk '{print $2}'))
+    net_dns_ip=($(grep '^nameserver [0-9.]' /etc/resolv.conf | awk '{print $2}' | sort -u))
 fi
 
 # CPU Information (Apple Silicon / Intel Mac)
