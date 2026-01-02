@@ -35,7 +35,7 @@ max_length() {
     fi
 }
 
-# All data strings must go here
+# All data strings must go here (excluding bar graphs - they're sized to fit CURRENT_LEN)
 set_current_len() {
     CURRENT_LEN=$(max_length                                     \
         "$report_title"                                          \
@@ -49,13 +49,8 @@ set_current_len() {
         "$cpu_cores_per_socket vCPU(s) / $cpu_sockets Socket(s)" \
         "$cpu_hypervisor"                                        \
         "$cpu_freq GHz"                                          \
-        "$cpu_1min_bar_graph"                                    \
-        "$cpu_5min_bar_graph"                                    \
-        "$cpu_15min_bar_graph"                                   \
         "$root_used_gb/$root_total_gb GB [$disk_percent%]"       \
-        "$disk_bar_graph"                                        \
         "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"   \
-        "${mem_bar_graph}"                                       \
         "$last_login_time"                                       \
         "$last_login_ip"                                         \
         "$sys_uptime"                                            \
